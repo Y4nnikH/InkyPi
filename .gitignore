@@ -172,3 +172,4 @@ mock_display_output/
 # Static Files added by install/update_vendors.sh
 /src/static/scripts/
 /src/static/styles/
+src/static/images/current_image.png
