@@ -173,3 +173,6 @@ mock_display_output/
 /src/static/scripts/
 /src/static/styles/
 src/static/images/current_image.png
+
+# VS Code settings
+.vscode/*
