@@ -314,10 +314,10 @@ class ImageMemories(BasePlugin):
                 dimensions = dimensions[::-1]
 
             if settings.get('backgroundOption') == "blur":
-                return pad_image_blur(img, dimensions) # type: ignore
+                img = pad_image_blur(img, dimensions) # type: ignore
             else:
                 background_color = ImageColor.getcolor(settings.get('backgroundColor') or (255, 255, 255), "RGB")
-                return ImageOps.pad(img, dimensions, color=background_color, method=Image.Resampling.LANCZOS)
+                img = ImageOps.pad(img, dimensions, color=background_color, method=Image.Resampling.LANCZOS)
         else:
             # need to resize here so text overlay scales correctly
             img = resize_image(

@@ -172,7 +172,7 @@ def take_screenshot(target, dimensions, timeout_ms=None):
 
     return image
 
-def pad_image_blur(img: Image, dimensions: tuple[int, int]) -> Image:
+def pad_image_blur(img: Image.Image, dimensions: tuple[int, int]) -> Image.Image:
     bkg = ImageOps.fit(img, dimensions)
     bkg = bkg.filter(ImageFilter.BoxBlur(8))
     img = ImageOps.contain(img, dimensions)
