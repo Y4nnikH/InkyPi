@@ -31,7 +31,7 @@
     </div>
 
     <div class="form-group">
-        <label for="requireFace" class="form-label">Require Face Detection:</label>
+        <label for="requireFace" class="form-label">Require Face:</label>
         <div class="toggle-container">
             <input type="checkbox" id="requireFace" name="requireFace" class="toggle-checkbox" value="false"
                 onclick="this.value = this.checked ? 'true' : 'false'">
@@ -50,11 +50,11 @@
 
     <div class="form-group">
         <label for="showLocation" class="form-label">Show Location:</label>
-        <div class="toggle-container">
-            <input type="checkbox" id="showLocation" name="showLocation" class="toggle-checkbox" value="false"
-                onclick="this.value = this.checked ? 'true' : 'false'">
-            <label for="showLocation" class="toggle-label"></label>
-        </div>
+        <select id="showLocation" name="showLocation" class="form-input">
+            <option value="none">None</option>
+            <option value="country">Country</option>
+            <option value="city">City</option>
+        </select>
     </div>
 
     <div class="form-group">
@@ -85,7 +85,8 @@
             document.getElementById('randomize').checked = pluginSettings.randomize;
             document.getElementById('requireFace').checked = pluginSettings.requireFace == 'true';
             document.getElementById('showDate').checked = pluginSettings.showDate == 'true';
-            document.getElementById('showLocation').checked = pluginSettings.showLocation == 'true';
+            const showLocation = (pluginSettings.showLocation || 'none').toString().toLowerCase();
+            document.getElementById('showLocation').value = ['none', 'country', 'city'].includes(showLocation) ? showLocation : 'none';
             document.getElementById('fontSize').value = pluginSettings.fontSize || 4;
             document.getElementById('backgroundColor').value = pluginSettings.backgroundColor;
             backgroundOption = pluginSettings.backgroundOption || 'blur'
