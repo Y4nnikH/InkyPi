@@ -144,58 +144,66 @@ class ImmichProvider:
             height=asset["height"],
         ) for memory in memories for asset in memory.get("assets", []) if asset["type"] == "IMAGE"]
 
-    def get_image(self, prev_index: int, randomize: bool, require_face: bool = False) -> tuple[Image.Image | None, int, Memory | None]:
+    def get_image(self, next_memory_ids: list[str] | None, randomize: bool, require_face: bool = False) -> tuple[Image.Image, list[str], Memory]:
         try:
             logger.info("Getting asset IDs for todays memories")
             asset_data = self.get_asset_data()
         except Exception as e:
-            logger.error(f"Error grabbing image from {self.base_url}: {e}")
-            return None, -1, None
+            raise RuntimeError(f"Error grabbing image from {self.base_url}: {e}") from e
 
         if not asset_data:
-            logger.error("No memories found for today.")
-            return None, -1, None
+            raise RuntimeError("No memories found for today.")
 
         filtered_assets = [a for a in asset_data if
                            (self.orientation == "horizontal" and a.width >= a.height) or
                             (self.orientation == "vertical" and a.height >= a.width)]
 
         if not filtered_assets:
-            logger.error("No suitable images found for the specified orientation.")
-            return None, -1, None
+            raise RuntimeError("No suitable images found for the specified orientation.")
 
-        # Try to find an image with a face if required
-        start_index = (prev_index + 1) % len(filtered_assets)
+        available_ids = [asset.id for asset in filtered_assets]
 
-        indices_to_check = [(start_index + i) % len(filtered_assets) for i in range(len(filtered_assets))]
+        queue = next_memory_ids.copy() if next_memory_ids else []
+
         if randomize:
-            indices_to_check = indices_to_check[:-1] # exclude prev_index
-            random.shuffle(indices_to_check)
-            # make sure to check the previous index last
-            indices_to_check.append(prev_index)
+            random.shuffle(queue)
 
-        # find the next image with a face, if required
-        for current_index in indices_to_check:
-            asset = filtered_assets[current_index]
+        assets_by_id = {asset.id: asset for asset in filtered_assets}
 
-            # get additional metadata for text overlay
-            r = self.send_request(f"/api/assets/{asset.id}").json()
-            asset.country = r.get("exifInfo", {}).get("country", None)
-            asset.city = r.get("exifInfo", {}).get("city", None)
-            asset.people = [person.get("name") for person in r.get("people", [])]
-            logger.info(f"Downloading image {asset.id}")
-            r = self.send_request(f"/api/assets/{asset.id}/original")
-            img = Image.open(BytesIO(r.content))
-            img = ImageOps.exif_transpose(img)
+        # Try current queue first. If it is empty or gets exhausted by skips, reset once and retry.
+        for attempt in range(2):
+            while queue:
+                # Remove candidate from queue whether it is skipped or selected.
+                current_id = queue.pop(0)
+                asset = assets_by_id.get(current_id)
+                if not asset: # Asset may not be found if the API response changed since the queue was built
+                    continue
 
-            if require_face and not asset.people:
-                continue
+                # get additional metadata for text overlay
+                r = self.send_request(f"/api/assets/{asset.id}").json()
+                asset.country = r.get("exifInfo", {}).get("country", None)
+                asset.city = r.get("exifInfo", {}).get("city", None)
+                asset.people = [person.get("name") for person in r.get("people", [])]
 
-            return img, current_index, asset
+                if require_face and not asset.people:
+                    logger.info(f"Skipping memory {asset.id} because no face metadata was found.")
+                    continue
 
-        # If no image with face was found after checking all, return None
-        logger.warning("No images with faces found in memories")
-        return None, -1, None
+                logger.info(f"Downloading image {asset.id}")
+                r = self.send_request(f"/api/assets/{asset.id}/original")
+                img = Image.open(BytesIO(r.content))
+                img = ImageOps.exif_transpose(img)
+
+                return img, queue, asset
+
+            if attempt == 0:
+                # Queue was exhausted (e.g. only non-face items remained). Rebuild once.
+                queue = available_ids.copy()
+                if randomize:
+                    random.shuffle(queue)
+
+        # If no matching image was found after one rebuild, raise an error.
+        raise RuntimeError("No usable memory images found after checking the current queue.")
 
 class ImageMemories(BasePlugin):
     def generate_settings_template(self):
@@ -211,7 +219,7 @@ class ImageMemories(BasePlugin):
         orientation = device_config.get_config("orientation")
         img = None
         memory = None
-        prev_index = settings.get('_lastMemoryIndex', -1)
+        next_memory_ids = settings.get('_nextMemoryIds', [])
         randomize = settings.get('randomize') == 'true'
 
         match settings.get("memoriesProvider"):
@@ -226,10 +234,11 @@ class ImageMemories(BasePlugin):
 
                 provider = ImmichProvider(url, key, orientation)
                 require_face = settings.get('requireFace') == 'true'
-                img, idx, memory = provider.get_image(prev_index, randomize, require_face)
+                img, next_memory_ids, memory = provider.get_image(next_memory_ids, randomize, require_face)
                 if not img:
                     raise RuntimeError("Failed to load image, please check logs.")
-                settings['_lastMemoryIndex'] = idx
+                settings['_nextMemoryIds'] = next_memory_ids
+                settings.pop('_lastMemoryIndex', None)
 
         if img is None:
             raise RuntimeError("Failed to load image, please check logs.")
