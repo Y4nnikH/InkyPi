@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import os
 import random
@@ -129,7 +129,7 @@ class ImmichProvider:
 
     def get_todays_memories(self) -> list[dict]:
         params = {
-            "for": datetime.now().isoformat(),
+            "for": datetime.now(timezone.utc).isoformat(),
             "order": "desc"
         }
         r = self.send_request("/api/memories", params=params)
