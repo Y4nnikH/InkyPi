@@ -129,7 +129,7 @@ class ImmichProvider:
 
     def get_todays_memories(self) -> list[dict]:
         params = {
-            "for": datetime.now(timezone.utc).isoformat(),
+            "for": datetime.now(timezone.utc).date().isoformat(),
             "order": "desc"
         }
         r = self.send_request("/api/memories", params=params)
